@@ -1,0 +1,124 @@
+---
+import { getDashboard, type JobRunRow } from '@usnt/db';
+import Admin from '../layouts/Admin.astro';
+import { getDb } from '../lib/db';
+
+const { counts, jobRuns, metrics } = await getDashboard(getDb());
+
+const fmt = (value: Date | string | null) =>
+  value
+    ? new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(new Date(value)) + ' ET'
+    : 'never';
+
+const STALE_HOURS = 26;
+// A job still unfinished after this long was cut off (e.g. by the Workers CPU limit).
+const STUCK_MINUTES = 15;
+
+function runResult(r: JobRunRow): string {
+  if (r.ok !== null) return r.ok ? 'OK' : 'Failed';
+  const ageMs = Date.now() - new Date(r.started_at).getTime();
+  return ageMs > STUCK_MINUTES * 60 * 1000 ? 'Didn’t finish' : 'Running';
+}
+
+const lastUpdate = counts.matches_updated_at ? new Date(counts.matches_updated_at).getTime() : 0;
+const stale = Date.now() - lastUpdate > STALE_HOURS * 60 * 60 * 1000;
+---
+
+<Admin title="Dashboard">
+  {
+    stale && (
+      <p class="warning" role="alert">
+        Fixtures haven't refreshed in over {STALE_HOURS} hours. Check the jobs Worker's logs in the
+        Cloudflare dashboard.
+      </p>
+    )
+  }
+
+  <h2>At a glance</h2>
+  <table>
+    <tbody>
+      <tr><th scope="row">Players: men / women</th><td>{counts.players_men} / {counts.players_women}</td></tr>
+      <tr><th scope="row">Players: active / eligible</th><td>{counts.players_active} / {counts.players_eligible}</td></tr>
+      <tr><th scope="row">Players without a club</th><td>{counts.players_without_team}</td></tr>
+      <tr><th scope="row">Matches with tracked players, next 7 days</th><td>{counts.tracked_matches_next_7_days}</td></tr>
+      <tr>
+        <th scope="row">Matches the provider stopped returning, last 30 days</th>
+        <td>{counts.missing_matches} <small>(usually rescheduled; hidden on the site until found again)</small></td>
+      </tr>
+      <tr><th scope="row">Open corrections</th><td><a href="/corrections">{counts.open_corrections}</a></td></tr>
+      <tr><th scope="row">Fixtures last updated</th><td>{fmt(counts.matches_updated_at)}</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Recent job runs</h2>
+  {
+    jobRuns.length === 0 ? (
+      <p>No jobs have run yet.</p>
+    ) : (
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Job</th>
+              <th scope="col">Started</th>
+              <th scope="col">Result</th>
+              <th scope="col">Provider calls</th>
+              <th scope="col">Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobRuns.map((r) => (
+              <tr>
+                <td>{r.job}</td>
+                <td>{fmt(r.started_at)}</td>
+                <td>{runResult(r)}</td>
+                <td>{r.calls}</td>
+                <td>{r.detail ?? ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  <h2>Daily metrics, last 14 days</h2>
+  {
+    metrics.length === 0 ? (
+      <p>The first snapshot is saved by the daily job.</p>
+    ) : (
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              <th scope="col">Metric</th>
+              <th scope="col">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {metrics.map((m) => (
+              <tr>
+                <td>{m.day}</td>
+                <td>{m.metric}</td>
+                <td>{m.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  <h2>Tracked elsewhere for now</h2>
+  <p>
+    Traffic (Cloudflare Web Analytics), ad revenue, and hosting and database spend (Cloudflare and Neon
+    dashboards) aren't pulled in yet. Add them to the daily metrics job as each one's API is set up.
+  </p>
+</Admin>

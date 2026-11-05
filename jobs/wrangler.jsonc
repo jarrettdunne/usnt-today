@@ -1,0 +1,15 @@
+{
+  "name": "usnt-jobs",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // No public URL: this Worker only runs on its cron schedule.
+  "workers_dev": false,
+  "triggers": {
+    // Keep in sync with DAILY, RECENT and SQUADS in src/index.ts.
+    // 10:00 UTC is about 6 a.m. U.S. Eastern.
+    "crons": ["0 10 * * *", "*/30 * * * *", "15 * * * *"]
+  },
+  "observability": { "enabled": true }
+  // Secrets (set with `npx wrangler secret put NAME`): DATABASE_URL, FOOTBALL_DATA_TOKEN
+}

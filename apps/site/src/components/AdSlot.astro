@@ -1,0 +1,27 @@
+---
+// Fixed-size ad slot. The reserved height stops the layout from shifting when an
+// ad loads. Renders nothing in production until PUBLIC_ADS_ENABLED=true.
+interface Props {
+  id: string;
+  height?: number;
+}
+
+const { id, height = 250 } = Astro.props;
+const enabled = import.meta.env.PUBLIC_ADS_ENABLED === 'true';
+const showPlaceholder = import.meta.env.DEV && !enabled;
+---
+
+{
+  enabled && (
+    <aside class="ad-slot" data-ad-slot={id} style={`min-height:${height}px`} aria-label="Advertisement">
+      {/* Sponsor or ad network code goes here. */}
+    </aside>
+  )
+}
+{
+  showPlaceholder && (
+    <aside class="ad-slot ad-slot--placeholder" style={`min-height:${height}px`} aria-hidden="true">
+      <small>[ Ad slot "{id}": fixed size, space reserved before it loads ]</small>
+    </aside>
+  )
+}

@@ -1,0 +1,2 @@
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/neondb?sslmode=require"
+ADMIN_DEV_BYPASS="true"

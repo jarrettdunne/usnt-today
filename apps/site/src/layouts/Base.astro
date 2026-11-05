@@ -1,0 +1,66 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title, description = 'Which American players have games today, and where to watch them in the U.S.' } =
+  Astro.props;
+const pool = Astro.locals.pool;
+const path = Astro.url.pathname;
+const fullTitle = title ? `${title} | usnt.today` : 'usnt.today';
+const correctionHref = `/correction?page=${encodeURIComponent(path)}`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="stylesheet" href="/styles.css" />
+    <!-- Lets CSS tell whether scripts run (the home page shows one day at a time only if they do). -->
+    <script is:inline>document.documentElement.classList.add('js');</script>
+  </head>
+  <body>
+    <header>
+      <p class="site-name"><a href="/">usnt.today</a></p>
+      <nav aria-label="Player pool" class="pool-toggle">
+        {pool === 'men' ? <strong aria-current="true">Men</strong> : <a href={`${path}?pool=men`} data-astro-prefetch="false">Men</a>}
+        <span class="sep"> | </span>
+        {pool === 'women' ? <strong aria-current="true">Women</strong> : <a href={`${path}?pool=women`} data-astro-prefetch="false">Women</a>}
+      </nav>
+    </header>
+    <nav aria-label="Sections" class="sections">
+      <a href="/">Today</a><span class="sep"> | </span><a href="/transfers">Transfers</a><span class="sep"> | </span><a href="/about">About</a>
+    </nav>
+    <hr />
+    <main>
+      <slot />
+    </main>
+    <hr />
+    <footer>
+      <p>
+        Not affiliated with U.S. Soccer. <a href="/about">About</a> |
+        <a href={correctionHref}>Suggest a correction</a>
+      </p>
+      <p><small>Football data provided by the Football-Data.org API.</small></p>
+    </footer>
+    <script is:inline>
+      // Show kickoff times in the visitor's own time zone (server renders U.S. Eastern).
+      for (const el of document.querySelectorAll('time[data-local]')) {
+        const d = new Date(el.getAttribute('datetime'));
+        if (Number.isNaN(d.getTime())) continue;
+        const mode = el.dataset.local;
+        const opts =
+          mode === 'date'
+            ? { weekday: 'short', month: 'short', day: 'numeric' }
+            : mode === 'datetime'
+              ? { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
+              : { hour: 'numeric', minute: '2-digit' };
+        el.textContent = new Intl.DateTimeFormat(undefined, opts).format(d);
+      }
+    </script>
+  </body>
+</html>

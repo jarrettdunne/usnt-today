@@ -1,0 +1,50 @@
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const path = Astro.url.pathname;
+const links: [string, string][] = [
+  ['/', 'Dashboard'],
+  ['/players', 'Players'],
+  ['/transfers', 'Transfers'],
+  ['/callups', 'Call-ups'],
+  ['/tv-rights', 'TV rights'],
+  ['/corrections', 'Corrections'],
+];
+const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} | usnt.today admin</title>
+    <link rel="stylesheet" href="/admin.css" />
+  </head>
+  <body>
+    <header>
+      <p><strong>usnt.today admin</strong></p>
+      <nav>
+        {
+          links.map(([href, label], i) => (
+            <>
+              {i > 0 && ' | '}
+              <a href={href} aria-current={isCurrent(href) ? 'page' : undefined}>
+                {label}
+              </a>
+            </>
+          ))
+        }
+      </nav>
+    </header>
+    <hr />
+    <main>
+      <h1>{title}</h1>
+      <slot />
+    </main>
+  </body>
+</html>

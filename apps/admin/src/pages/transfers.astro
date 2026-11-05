@@ -1,0 +1,100 @@
+---
+import {
+  TRANSFER_KINDS,
+  TRANSFER_KIND_LABELS,
+  createTransfer,
+  getRecentTransfers,
+  listPlayerOptions,
+  listTeamOptions,
+  safeHref,
+} from '@usnt/db';
+import Admin from '../layouts/Admin.astro';
+import { getDb } from '../lib/db';
+import { isForeignKeyViolation, parseTransferForm } from '../lib/forms';
+
+const sql = getDb();
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const parsed = parseTransferForm(form);
+  if (parsed.error !== undefined) {
+    error = parsed.error;
+  } else {
+    try {
+      await createTransfer(sql, parsed.input, form.get('update_current_team') === 'on');
+      return Astro.redirect('/transfers', 303);
+    } catch (err) {
+      if (!isForeignKeyViolation(err)) throw err;
+      error = 'That player or club no longer exists. Reload the page and try again.';
+    }
+  }
+  Astro.response.status = 400;
+}
+
+const [transfers, players, teams] = await Promise.all([
+  getRecentTransfers(sql, 50),
+  listPlayerOptions(sql),
+  listTeamOptions(sql),
+]);
+---
+
+<Admin title="Transfers">
+  <h2>Record a confirmed move</h2>
+  <p>Only moves confirmed by an official club, league or federation announcement.</p>
+  <form method="post">
+    {error && <p role="alert"><strong>{error}</strong></p>}
+    <p>
+      <label>Player<br />
+        <select name="player_id" required>
+          <option value="">Choose a player</option>
+          {players.map((p) => <option value={p.id}>{p.name}</option>)}
+        </select>
+      </label>
+    </p>
+    <p>
+      <label>From club<br />
+        <select name="from_team_id">
+          <option value="">Not listed</option>
+          {teams.map((t) => <option value={t.id}>{t.name}</option>)}
+        </select>
+      </label>
+    </p>
+    <p>
+      <label>To club<br />
+        <select name="to_team_id">
+          <option value="">Not listed</option>
+          {teams.map((t) => <option value={t.id}>{t.name}</option>)}
+        </select>
+      </label>
+    </p>
+    <p><label>Date<br /><input type="date" name="transfer_date" required /></label></p>
+    <p>
+      <label>Type<br />
+        <select name="kind">
+          {TRANSFER_KINDS.map((kind) => <option value={kind}>{TRANSFER_KIND_LABELS[kind]}</option>)}
+        </select>
+      </label>
+    </p>
+    <p><label>Fee (only if officially disclosed)<br /><input name="fee_text" /></label></p>
+    <p><label>Official announcement link<br /><input type="url" name="source_url" required size="60" /></label></p>
+    <p><label><input type="checkbox" name="update_current_team" checked /> Update the player's current club</label></p>
+    <p><button type="submit">Record transfer</button></p>
+  </form>
+
+  <h2>Recent transfers</h2>
+  {
+    transfers.length === 0 ? (
+      <p>None recorded yet.</p>
+    ) : (
+      <ul>
+        {transfers.map((t) => (
+          <li>
+            {t.transfer_date}: {t.player_name}, {t.from_team ?? 'not listed'} to {t.to_team ?? 'not listed'} ({TRANSFER_KIND_LABELS[t.kind]})
+            {safeHref(t.source_url) && <> <a href={safeHref(t.source_url)}>source</a></>}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</Admin>

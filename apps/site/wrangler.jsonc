@@ -1,0 +1,11 @@
+{
+  "name": "usnt-site",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Per-visitor limit on the corrections form (see src/pages/correction.astro).
+  "ratelimits": [{ "name": "CORRECTIONS_LIMITER", "namespace_id": "1001", "simple": { "limit": 3, "period": 60 } }]
+  // Once the domain is on Cloudflare:
+  // "routes": [{ "pattern": "usnt.today", "custom_domain": true }]
+  // Secrets (set with `npx wrangler secret put NAME`): DATABASE_URL
+}

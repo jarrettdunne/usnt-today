@@ -1,0 +1,35 @@
+{
+  "name": "usnt-today",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "jobs",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "env:sync": "node --env-file-if-exists=.env scripts/dev-vars.mjs",
+    "db:migrate": "node --env-file-if-exists=.env packages/db/scripts/migrate.mjs",
+    "dev:site": "npm run dev -w @usnt/site",
+    "dev:admin": "npm run dev -w @usnt/admin",
+    "dev:jobs": "npm run dev -w @usnt/jobs",
+    "build": "npm run build -w @usnt/site && npm run build -w @usnt/admin",
+    "deploy:site": "npm run deploy -w @usnt/site",
+    "deploy:admin": "npm run deploy -w @usnt/admin",
+    "deploy:jobs": "npm run deploy -w @usnt/jobs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "squads:import": "node --env-file-if-exists=.env node_modules/tsx/dist/cli.mjs jobs/scripts/import-squads.ts"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@electric-sql/pglite": "^0.5.14",
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

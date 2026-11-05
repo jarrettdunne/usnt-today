@@ -1,0 +1,69 @@
+---
+import { listCorrections, setCorrectionStatus, type CorrectionStatus } from '@usnt/db';
+import Admin from '../layouts/Admin.astro';
+import { getDb } from '../lib/db';
+import { optInt, str } from '../lib/forms';
+
+const sql = getDb();
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const id = optInt(form, 'id');
+  const status = str(form, 'status') as CorrectionStatus;
+  if (id && (status === 'resolved' || status === 'rejected' || status === 'open')) {
+    await setCorrectionStatus(sql, id, status);
+  }
+  return Astro.redirect('/corrections', 303);
+}
+
+const corrections = await listCorrections(sql);
+const fmt = (value: Date | string) =>
+  new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' }).format(
+    new Date(value),
+  );
+---
+
+<Admin title="Corrections">
+  {
+    corrections.length === 0 ? (
+      <p>No corrections submitted yet.</p>
+    ) : (
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Received</th>
+              <th scope="col">Page</th>
+              <th scope="col">Message</th>
+              <th scope="col">Status</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {corrections.map((c) => (
+              <tr>
+                <td>{fmt(c.created_at)}</td>
+                <td>{c.page_url ?? ''}</td>
+                <td>{c.message}</td>
+                <td>{c.status}</td>
+                <td>
+                  <form method="post" class="inline">
+                    <input type="hidden" name="id" value={c.id} />
+                    {c.status === 'open' ? (
+                      <>
+                        <button type="submit" name="status" value="resolved">Mark fixed</button>{' '}
+                        <button type="submit" name="status" value="rejected">Dismiss</button>
+                      </>
+                    ) : (
+                      <button type="submit" name="status" value="open">Reopen</button>
+                    )}
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+</Admin>

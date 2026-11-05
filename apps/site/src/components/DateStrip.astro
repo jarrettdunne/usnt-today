@@ -1,0 +1,85 @@
+---
+// The week at a glance: one button per day, with the day's player counts under its
+// label. Each links to its section of the page; the script on the home page shows
+// that section and moves the highlight.
+import type { DayCount } from '@usnt/db';
+
+interface Props {
+  days: DayCount[];
+  today: string;
+}
+
+const { days, today } = Astro.props;
+
+// Days are YYYY-MM-DD in U.S. Eastern; formatting at noon UTC keeps the date as written.
+const fmt = (day: string, options: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat('en-US', { ...options, timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`));
+/** "Nov 2" */
+const dateLabel = (day: string) => fmt(day, { month: 'short', day: 'numeric' });
+/** "Today", otherwise the weekday: "Tue" */
+const weekdayLabel = (day: string) => (day === today ? 'Today' : fmt(day, { weekday: 'short' }));
+const hasLineups = (d: DayCount) => d.starting + d.bench > 0;
+const isEmpty = (d: DayCount) => d.in_squad === 0;
+// The color key only matters once a provider sends lineups (not on the free tier).
+const anyLineups = days.some(hasLineups);
+const describe = (d: DayCount) => {
+  if (isEmpty(d)) return 'no tracked players with a game';
+  const parts = hasLineups(d)
+    ? [`${d.starting} starting`, `${d.bench} on the bench`]
+    : [`${d.in_squad} tracked ${d.in_squad === 1 ? 'player' : 'players'} with a game`];
+  if (d.out_count > 0) parts.push(`${d.out_count} injured or suspended`);
+  return parts.join(', ');
+};
+---
+
+<nav class="date-nav" aria-label="Days this week">
+  <ul class="date-strip">
+    {
+      days.map((d) => (
+        <li>
+          <a
+            href={`#day-${d.day}`}
+            data-day={d.day}
+            class:list={{ 'is-selected': d.day === today, 'is-empty': isEmpty(d) }}
+            aria-current={d.day === today ? 'page' : undefined}
+            title={describe(d)}
+          >
+            <span class="day-date">{dateLabel(d.day)}</span>
+            <span class="day-label">{weekdayLabel(d.day)}</span><span class="sr-only">, {describe(d)}</span>
+            <span class="day-counts" aria-hidden="true">
+              {isEmpty(d) ? (
+                '–'
+              ) : hasLineups(d) ? (
+                <>
+                  <span class="n-start">{d.starting}</span> <span class="n-bench">{d.bench}</span>
+                </>
+              ) : (
+                <span class="n-squad">{d.in_squad}</span>
+              )}
+              {d.out_count > 0 && (
+                <>
+                  {' '}
+                  <span class="n-out">{d.out_count}</span>
+                </>
+              )}
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</nav>
+<p class="strip-note">
+  <small>
+    {
+      anyLineups ? (
+        <>
+          Players: <span class="swatch swatch-starting" />starting, <span class="swatch swatch-bench" />bench,{' '}
+          <span class="swatch swatch-out" />injured or suspended.
+        </>
+      ) : (
+        'Numbers are tracked players with a game that day.'
+      )
+    }
+  </small>
+</p>

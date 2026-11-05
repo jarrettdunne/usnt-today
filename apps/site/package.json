@@ -1,0 +1,21 @@
+{
+  "name": "@usnt/site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler types && astro dev",
+    "build": "wrangler types && astro build",
+    "preview": "astro preview",
+    "deploy": "npm run build && wrangler deploy",
+    "typecheck": "wrangler types && astro check"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^13.0.0",
+    "@usnt/db": "*",
+    "astro": "^6.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "wrangler": "^4.0.0"
+  }
+}

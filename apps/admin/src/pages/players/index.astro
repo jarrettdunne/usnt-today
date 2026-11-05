@@ -1,0 +1,85 @@
+---
+import { createPlayer, listPlayers, listTeamOptions, safeHref, type PlayerInput } from '@usnt/db';
+import PlayerForm from '../../components/PlayerForm.astro';
+import Admin from '../../layouts/Admin.astro';
+import { getDb } from '../../lib/db';
+import { isForeignKeyViolation, isUniqueViolation, parsePlayerForm, playerFormValues } from '../../lib/forms';
+
+const sql = getDb();
+let error = '';
+let values: Partial<PlayerInput> = {};
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const parsed = parsePlayerForm(form);
+  if (parsed.error !== undefined) {
+    error = parsed.error;
+    values = playerFormValues(form);
+  } else {
+    try {
+      await createPlayer(sql, parsed.input);
+      return Astro.redirect('/players', 303);
+    } catch (err) {
+      if (isUniqueViolation(err)) error = 'That URL slug is already taken. Pick another.';
+      else if (isForeignKeyViolation(err)) error = 'That club no longer exists. Reload the page and pick another.';
+      else throw err;
+      values = parsed.input;
+    }
+  }
+  Astro.response.status = 400;
+}
+
+const [players, teams] = await Promise.all([listPlayers(sql), listTeamOptions(sql)]);
+---
+
+<Admin title="Players">
+  <p>
+    {players.length} players. Select a name to edit. Imported players come from club squad lists
+    (football-data.org nationality) and start as Eligible; check them and change the group or
+    source as needed. Edits you make are kept by later imports, and a club you set yourself
+    isn't overwritten.
+  </p>
+  {
+    players.length > 0 && (
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Pool</th>
+              <th scope="col">Group</th>
+              <th scope="col">Position</th>
+              <th scope="col">Club</th>
+              <th scope="col">Eligibility source</th>
+              <th scope="col">Added by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((p) => (
+              <tr>
+                <td>
+                  <a href={`/players/${p.id}`}>{p.name}</a>
+                </td>
+                <td>{p.pool}</td>
+                <td>{p.player_group}</td>
+                <td>{p.position ?? ''}</td>
+                <td>{p.team ?? <strong>None</strong>}</td>
+                <td>
+                  {safeHref(p.eligibility_url) ? (
+                    <a href={safeHref(p.eligibility_url)}>{p.eligibility_source ?? 'Link'}</a>
+                  ) : (
+                    (p.eligibility_source ?? <strong>Missing</strong>)
+                  )}
+                </td>
+                <td>{p.added_by === 'editor' ? 'Editor' : `Import (${p.added_by})`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  <h2>Add a player</h2>
+  <PlayerForm teams={teams} values={values} submitLabel="Add player" error={error} />
+</Admin>

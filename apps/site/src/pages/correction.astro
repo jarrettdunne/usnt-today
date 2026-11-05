@@ -1,0 +1,81 @@
+---
+import { insertCorrection } from '@usnt/db';
+import Base from '../layouts/Base.astro';
+import { getDb } from '../lib/db';
+import { allowCorrection } from '../lib/rate-limit';
+
+// Across all visitors. Stops a flood from filling the free database.
+const HOURLY_CAP = 30;
+const MAX_MESSAGE = 2000;
+const MAX_PAGE = 500;
+
+/** Only a same-site path is kept, e.g. "/player/some-name". */
+function cleanPage(value: string): string {
+  const page = value.trim().slice(0, MAX_PAGE);
+  return page.startsWith('/') && !page.startsWith('//') ? page : '';
+}
+
+let sent = false;
+let error = '';
+let message = '';
+let page = cleanPage(Astro.url.searchParams.get('page') ?? '');
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  message = String(form.get('message') ?? '').trim();
+  page = cleanPage(String(form.get('page') ?? ''));
+  const honeypot = String(form.get('website') ?? '');
+
+  if (honeypot) {
+    sent = true; // Bots fill the hidden field; pretend it worked.
+  } else if (message.length < 5) {
+    error = 'Describe what needs fixing in a few words.';
+    Astro.response.status = 400;
+  } else if (message.length > MAX_MESSAGE) {
+    error = 'Keep the message under 2,000 characters.';
+    Astro.response.status = 400;
+  } else if (!(await allowCorrection(Astro.request))) {
+    error = 'Too many corrections sent from here just now. Try again in a minute.';
+    Astro.response.status = 429;
+  } else if (await insertCorrection(getDb(), { pageUrl: page || null, message }, HOURLY_CAP)) {
+    sent = true;
+  } else {
+    error = 'We’re getting a lot of corrections right now. Try again in an hour.';
+    Astro.response.status = 429;
+  }
+}
+---
+
+<Base title="Suggest a correction">
+  <h1>Suggest a correction</h1>
+  {
+    sent ? (
+      <p>Thanks. An editor will review it. Nationality questions go to the eligibility source linked on the player's page.</p>
+    ) : (
+      <form method="post">
+        {error && (
+          <p role="alert">
+            <strong>{error}</strong>
+          </p>
+        )}
+        <input type="hidden" name="page" value={page} />
+        <p>
+          <label>
+            What's wrong, and where can we confirm the right information?
+            <br />
+            <textarea name="message" rows="6" cols="60" required minlength="5" maxlength="2000">{message}</textarea>
+          </label>
+        </p>
+        <p hidden>
+          <label>
+            Leave this empty
+            <input name="website" tabindex="-1" autocomplete="off" />
+          </label>
+        </p>
+        <p>
+          <button type="submit">Send correction</button>
+        </p>
+      </form>
+    )
+  }
+</Base>

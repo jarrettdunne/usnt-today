@@ -1,0 +1,158 @@
+---
+import {
+  CALLUP_LEVEL_LABELS,
+  TRANSFER_KIND_LABELS,
+  getPlayerBySlug,
+  getPlayerCallups,
+  getPlayerTransfers,
+  getRecentTeamMatches,
+  getUpcomingTeamMatches,
+  safeHref,
+  type MatchSummary,
+} from '@usnt/db';
+import AdSlot from '../../components/AdSlot.astro';
+import LocalTime from '../../components/LocalTime.astro';
+import SourceLink from '../../components/SourceLink.astro';
+import WatchList from '../../components/WatchList.astro';
+import Base from '../../layouts/Base.astro';
+import { getDb } from '../../lib/db';
+
+const { slug } = Astro.params;
+const sql = getDb();
+const player = slug ? await getPlayerBySlug(sql, slug) : null;
+if (!player) {
+  return Astro.rewrite('/404');
+}
+
+const teamId = player.current_team_id;
+const [upcoming, recent, transfers, callups] = await Promise.all([
+  teamId ? getUpcomingTeamMatches(sql, teamId, 5) : Promise.resolve([] as MatchSummary[]),
+  teamId ? getRecentTeamMatches(sql, teamId, 5) : Promise.resolve([] as MatchSummary[]),
+  getPlayerTransfers(sql, player.id),
+  getPlayerCallups(sql, player.id),
+]);
+
+function ageFrom(birthDate: string | null): number | null {
+  if (!birthDate) return null;
+  const birth = new Date(`${birthDate}T00:00:00Z`);
+  const now = new Date();
+  let age = now.getUTCFullYear() - birth.getUTCFullYear();
+  const beforeBirthday =
+    now.getUTCMonth() < birth.getUTCMonth() ||
+    (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate());
+  if (beforeBirthday) age -= 1;
+  return age;
+}
+
+const age = ageFrom(player.birth_date);
+const eligibilityHref = safeHref(player.eligibility_url);
+function scoreLine(m: MatchSummary): string {
+  if (m.status === 'finished' && m.home_score !== null && m.away_score !== null) {
+    return `${m.home} ${m.home_score}-${m.away_score} ${m.away}`;
+  }
+  return `${m.home} vs ${m.away} (${m.status})`;
+}
+---
+
+<Base title={player.name} description={`${player.name}: club, schedule, and where to watch.`}>
+  <h1>{player.name}</h1>
+  <table>
+    <tbody>
+      <tr><th scope="row">Position</th><td>{player.position ?? 'Not listed'}</td></tr>
+      {age !== null && <tr><th scope="row">Age</th><td>{age}</td></tr>}
+      <tr><th scope="row">Club</th><td>{player.team ?? 'Not listed'}</td></tr>
+      <tr><th scope="row">Pool</th><td>{player.pool === 'men' ? "Men's" : "Women's"}</td></tr>
+      <tr><th scope="row">Group</th><td>{player.player_group === 'active' ? 'Active' : 'Eligible'}</td></tr>
+      <tr>
+        <th scope="row">Eligibility source</th>
+        <td>
+          {
+            eligibilityHref ? (
+              <a href={eligibilityHref} rel="nofollow noopener">
+                {player.eligibility_source ?? 'Source'}
+              </a>
+            ) : (
+              (player.eligibility_source ?? 'Not listed')
+            )
+          }
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Next matches</h2>
+  {
+    upcoming.length === 0 ? (
+      <p>No upcoming matches listed.</p>
+    ) : (
+      <ul>
+        {upcoming.map((m) => (
+          <li>
+            <LocalTime iso={m.kickoff_utc} mode="datetime" confirmed={m.kickoff_confirmed} />: {m.competition ?? 'Match'}, {m.home} vs {m.away}.
+            Watch: <WatchList watch={m.watch} />
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  <p><a href={`/calendar/${player.slug}.ics`} data-astro-prefetch="false">Add these matches to your calendar</a></p>
+
+  <h2>Recent results</h2>
+  {
+    recent.length === 0 ? (
+      <p>No recent results listed.</p>
+    ) : (
+      <ul>
+        {recent.map((m) => (
+          <li>
+            <LocalTime iso={m.kickoff_utc} mode="date" />: {m.competition ?? 'Match'}, {scoreLine(m)}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  <p><small>Results are for the club; match-by-match player stats aren't available yet.</small></p>
+
+  <h2>International</h2>
+  {
+    callups.length === 0 ? (
+      <p>No call-ups recorded.</p>
+    ) : (
+      <ul>
+        {callups.map((c) => (
+          <li>
+            {CALLUP_LEVEL_LABELS[c.level]} call-up, {c.window_start}
+            {c.window_end && ` to ${c.window_end}`} <SourceLink url={c.source_url} label="source" />
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  <h2>Transfers</h2>
+  {
+    transfers.length === 0 ? (
+      <p>No transfers recorded.</p>
+    ) : (
+      <ul>
+        {transfers.map((t) => (
+          <li>
+            {t.transfer_date}: {TRANSFER_KIND_LABELS[t.kind]}, {t.from_team ?? 'unknown'} to {t.to_team ?? 'unknown'}
+            {t.fee_text && `, ${t.fee_text}`} <SourceLink url={t.source_url} label="official announcement" />
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  {
+    player.bio && (
+      <>
+        <h2>About</h2>
+        <p>{player.bio}</p>
+      </>
+    )
+  }
+
+  <AdSlot id="player-1" />
+</Base>

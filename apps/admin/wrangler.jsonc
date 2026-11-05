@@ -1,0 +1,17 @@
+{
+  "name": "usnt-admin",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Only reachable through the custom domain protected by Cloudflare Access.
+  "workers_dev": false,
+  // "routes": [{ "pattern": "admin.usnt.today", "custom_domain": true }],
+  "vars": {
+    // From Zero Trust > Access > your admin application.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    // Never "true" in production. Local .dev.vars sets it to "true".
+    "ADMIN_DEV_BYPASS": "false"
+  },
+  "observability": { "enabled": true }
+  // Secrets (set with `npx wrangler secret put NAME`): DATABASE_URL
+}

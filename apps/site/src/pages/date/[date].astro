@@ -1,0 +1,13 @@
+---
+// Day pages were folded into the home page, which holds the whole week. Old links
+// go to that day's view when it's still in the week, otherwise to today.
+import { isIsoDay } from '@usnt/db';
+import { weekRange } from '../../lib/week';
+
+const { date } = Astro.params;
+const { first, last } = weekRange();
+const inWeek = !!date && isIsoDay(date) && date >= first && date <= last;
+
+// 302, not 301: which dates are in the week changes every day.
+return Astro.redirect(inWeek ? `/#day-${date}` : '/', 302);
+---

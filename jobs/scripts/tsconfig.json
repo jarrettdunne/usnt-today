@@ -1,0 +1,9 @@
+{
+  // Node scripts that reuse the Worker's providers and tasks.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "WebWorker"],
+    "types": ["node"]
+  },
+  "include": ["."]
+}

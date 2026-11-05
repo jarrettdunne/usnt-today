@@ -1,0 +1,40 @@
+---
+// Renders U.S. Eastern time on the server; the script in Base.astro converts it
+// to the visitor's local time in the browser. With `confirmed={false}` only the
+// date is shown, since the provider hasn't set the kickoff time yet.
+import { SITE_TZ, todayIn } from '@usnt/db';
+
+interface Props {
+  iso: Date | string;
+  mode?: 'time' | 'datetime' | 'date';
+  confirmed?: boolean;
+}
+
+const { iso, mode: requestedMode = 'time', confirmed = true } = Astro.props;
+const date = new Date(iso);
+const mode = confirmed ? requestedMode : 'date';
+const options: Intl.DateTimeFormatOptions =
+  mode === 'date'
+    ? { weekday: 'short', month: 'short', day: 'numeric' }
+    : mode === 'datetime'
+      ? { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
+      : { hour: 'numeric', minute: '2-digit' };
+const fallback =
+  new Intl.DateTimeFormat('en-US', { ...options, timeZone: SITE_TZ }).format(date) + (mode === 'date' ? '' : ' ET');
+// An unconfirmed kickoff isn't converted in the browser: its placeholder time
+// could land on a different local date than the one the provider set.
+const showTbc = !confirmed && requestedMode !== 'date';
+---
+
+{
+  confirmed ? (
+    <time datetime={date.toISOString()} data-local={mode}>
+      {fallback}
+    </time>
+  ) : (
+    <>
+      {requestedMode !== 'time' && <time datetime={todayIn(SITE_TZ, date)}>{fallback}</time>}
+      {showTbc && (requestedMode === 'time' ? 'Time to be confirmed' : ', time to be confirmed')}
+    </>
+  )
+}

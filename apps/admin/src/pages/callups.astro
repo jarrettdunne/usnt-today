@@ -1,0 +1,77 @@
+---
+import {
+  CALLUP_LEVELS,
+  CALLUP_LEVEL_LABELS,
+  createCallup,
+  listPlayerOptions,
+  listRecentCallups,
+  safeHref,
+} from '@usnt/db';
+import Admin from '../layouts/Admin.astro';
+import { getDb } from '../lib/db';
+import { isForeignKeyViolation, parseCallupForm } from '../lib/forms';
+
+const sql = getDb();
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const parsed = parseCallupForm(await Astro.request.formData());
+  if (parsed.error !== undefined) {
+    error = parsed.error;
+  } else {
+    try {
+      await createCallup(sql, parsed.input);
+      return Astro.redirect('/callups', 303);
+    } catch (err) {
+      if (!isForeignKeyViolation(err)) throw err;
+      error = 'That player no longer exists. Reload the page and try again.';
+    }
+  }
+  Astro.response.status = 400;
+}
+
+const [callups, players] = await Promise.all([listRecentCallups(sql, 50), listPlayerOptions(sql)]);
+---
+
+<Admin title="Call-ups">
+  <h2>Record a call-up</h2>
+  <p>From official U.S. Soccer roster announcements.</p>
+  <form method="post">
+    {error && <p role="alert"><strong>{error}</strong></p>}
+    <p>
+      <label>Player<br />
+        <select name="player_id" required>
+          <option value="">Choose a player</option>
+          {players.map((p) => <option value={p.id}>{p.name}</option>)}
+        </select>
+      </label>
+    </p>
+    <p>
+      <label>Level<br />
+        <select name="level">
+          {CALLUP_LEVELS.map((level) => <option value={level}>{CALLUP_LEVEL_LABELS[level]}</option>)}
+        </select>
+      </label>
+    </p>
+    <p><label>Window starts<br /><input type="date" name="window_start" required /></label></p>
+    <p><label>Window ends<br /><input type="date" name="window_end" /></label></p>
+    <p><label>Roster announcement link<br /><input type="url" name="source_url" required size="60" /></label></p>
+    <p><button type="submit">Record call-up</button></p>
+  </form>
+
+  <h2>Recent call-ups</h2>
+  {
+    callups.length === 0 ? (
+      <p>None recorded yet.</p>
+    ) : (
+      <ul>
+        {callups.map((c) => (
+          <li>
+            {c.window_start}: {c.player_name} ({CALLUP_LEVEL_LABELS[c.level]})
+            {safeHref(c.source_url) && <> <a href={safeHref(c.source_url)}>source</a></>}
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</Admin>

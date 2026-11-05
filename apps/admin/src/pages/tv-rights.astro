@@ -1,0 +1,97 @@
+---
+import { createTvRight, deleteTvRight, listCompetitionOptions, listTvRights, safeHref } from '@usnt/db';
+import Admin from '../layouts/Admin.astro';
+import { getDb } from '../lib/db';
+import { isForeignKeyViolation, optInt, parseTvRightForm, str } from '../lib/forms';
+
+const sql = getDb();
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  if (str(form, 'action') === 'delete') {
+    const id = optInt(form, 'id');
+    if (id) await deleteTvRight(sql, id);
+    return Astro.redirect('/tv-rights', 303);
+  }
+
+  const parsed = parseTvRightForm(form);
+  if (parsed.error !== undefined) {
+    error = parsed.error;
+  } else {
+    try {
+      await createTvRight(sql, parsed.input);
+      return Astro.redirect('/tv-rights', 303);
+    } catch (err) {
+      if (!isForeignKeyViolation(err)) throw err;
+      error = 'That competition no longer exists. Reload the page and try again.';
+    }
+  }
+  Astro.response.status = 400;
+}
+
+const [rights, competitions] = await Promise.all([listTvRights(sql), listCompetitionOptions(sql)]);
+---
+
+<Admin title="U.S. TV rights">
+  <p>
+    Who carries each competition in the U.S. Match cards show these unless a match has its own
+    override. Review before every season.
+  </p>
+
+  {
+    rights.length > 0 && (
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Competition</th>
+              <th scope="col">Network</th>
+              <th scope="col">From</th>
+              <th scope="col">To</th>
+              <th scope="col">Notes</th>
+              <th scope="col">Remove</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rights.map((r) => (
+              <tr>
+                <td>{r.competition}</td>
+                <td>{safeHref(r.url) ? <a href={safeHref(r.url)}>{r.network}</a> : r.network}</td>
+                <td>{r.valid_from}</td>
+                <td>{r.valid_to ?? 'open'}</td>
+                <td>{r.notes ?? ''}</td>
+                <td>
+                  <form method="post" class="inline">
+                    <input type="hidden" name="action" value="delete" />
+                    <input type="hidden" name="id" value={r.id} />
+                    <button type="submit">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  <h2>Add rights</h2>
+  <form method="post">
+    {error && <p role="alert"><strong>{error}</strong></p>}
+    <p>
+      <label>Competition<br />
+        <select name="competition_id" required>
+          <option value="">Choose a competition</option>
+          {competitions.map((c) => <option value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
+    </p>
+    <p><label>Network or streaming service<br /><input name="network" required /></label></p>
+    <p><label>Link to the network's page<br /><input type="url" name="url" size="60" /></label></p>
+    <p><label>Rights start<br /><input type="date" name="valid_from" required /></label></p>
+    <p><label>Rights end (blank if ongoing)<br /><input type="date" name="valid_to" /></label></p>
+    <p><label>Notes<br /><input name="notes" size="60" /></label></p>
+    <p><button type="submit">Add rights</button></p>
+  </form>
+</Admin>

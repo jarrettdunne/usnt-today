@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Runs inside Workers, so web APIs (URL, TextEncoder) are available.
+    "lib": ["ES2022", "WebWorker"],
+    // Only the tests use Node APIs (they read the migration files).
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}

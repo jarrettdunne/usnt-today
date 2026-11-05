@@ -1,0 +1,56 @@
+---
+import { TRANSFER_KIND_LABELS, getRecentTransfers, safeHref } from '@usnt/db';
+import AdSlot from '../components/AdSlot.astro';
+import Base from '../layouts/Base.astro';
+import { getDb } from '../lib/db';
+
+const transfers = await getRecentTransfers(getDb(), 100);
+---
+
+<Base title="Transfers" description="Confirmed transfers of USMNT- and USWNT-eligible players.">
+  <h1>Transfers</h1>
+  <p>Confirmed moves only, each linked to the official announcement.</p>
+  {
+    transfers.length === 0 ? (
+      <p>No transfers recorded yet.</p>
+    ) : (
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Player</th>
+              <th scope="col">From</th>
+              <th scope="col">To</th>
+              <th scope="col">Type</th>
+              <th scope="col">Fee</th>
+              <th scope="col">Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transfers.map((t) => (
+              <tr>
+                <td>{t.transfer_date}</td>
+                <td>
+                  <a href={`/player/${t.player_slug}`}>{t.player_name}</a>
+                </td>
+                <td>{t.from_team ?? ''}</td>
+                <td>{t.to_team ?? ''}</td>
+                <td>{TRANSFER_KIND_LABELS[t.kind]}</td>
+                <td>{t.fee_text ?? ''}</td>
+                <td>
+                  {safeHref(t.source_url) && (
+                    <a href={safeHref(t.source_url)} rel="nofollow noopener">
+                      Announcement
+                    </a>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+  <AdSlot id="transfers-1" />
+</Base>

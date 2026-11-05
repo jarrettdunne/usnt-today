@@ -1,0 +1,20 @@
+---
+// "(label)" linking to an official source, or nothing if the stored URL isn't http(s).
+import { safeHref } from '@usnt/db';
+
+interface Props {
+  url: string | null;
+  label: string;
+}
+
+const { url, label } = Astro.props;
+const href = safeHref(url);
+---
+
+{
+  href && (
+    <>
+      (<a href={href} rel="nofollow noopener">{label}</a>)
+    </>
+  )
+}

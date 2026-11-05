@@ -1,0 +1,44 @@
+---
+import { getPlayerForEdit, listTeamOptions, updatePlayer, type PlayerInput } from '@usnt/db';
+import PlayerForm from '../../components/PlayerForm.astro';
+import Admin from '../../layouts/Admin.astro';
+import { getDb } from '../../lib/db';
+import { isForeignKeyViolation, isUniqueViolation, parsePlayerForm, playerFormValues } from '../../lib/forms';
+
+const id = Number(Astro.params.id);
+const sql = getDb();
+const player = Number.isInteger(id) ? await getPlayerForEdit(sql, id) : null;
+if (!player) {
+  return new Response('Player not found', { status: 404 });
+}
+
+let error = '';
+let values: Partial<PlayerInput> = player;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const parsed = parsePlayerForm(form);
+  if (parsed.error !== undefined) {
+    error = parsed.error;
+    values = playerFormValues(form);
+  } else {
+    try {
+      await updatePlayer(sql, id, parsed.input);
+      return Astro.redirect('/players', 303);
+    } catch (err) {
+      if (isUniqueViolation(err)) error = 'That URL slug is already taken. Pick another.';
+      else if (isForeignKeyViolation(err)) error = 'That club no longer exists. Reload the page and pick another.';
+      else throw err;
+      values = parsed.input;
+    }
+  }
+  Astro.response.status = 400;
+}
+
+const teams = await listTeamOptions(sql);
+---
+
+<Admin title={`Edit ${player.name}`}>
+  <p><a href="/players">Back to players</a></p>
+  <PlayerForm teams={teams} values={values} submitLabel="Save changes" error={error} />
+</Admin>

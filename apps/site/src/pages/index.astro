@@ -1,0 +1,91 @@
+---
+// The whole week (today and the next 6 days) in one response, shown one day at a
+// time. Switching days happens in the browser, so it needs no request at all.
+// Without JavaScript, every day is shown, one after another.
+import { getDayCounts, getMatchesBetween, todayIn, type DayMatch } from '@usnt/db';
+import AdSlot from '../components/AdSlot.astro';
+import DateStrip from '../components/DateStrip.astro';
+import MatchList from '../components/MatchList.astro';
+import Base from '../layouts/Base.astro';
+import { getDb } from '../lib/db';
+import { longDayLabel, weekRange } from '../lib/week';
+
+const today = todayIn();
+const { first, last } = weekRange(today);
+const pool = Astro.locals.pool;
+const sql = getDb();
+
+const [counts, matches] = await Promise.all([
+  getDayCounts(sql, first, last, pool),
+  getMatchesBetween(sql, first, last, pool),
+]);
+
+const byDay = new Map<string, DayMatch[]>();
+for (const m of matches) {
+  const list = byDay.get(m.day);
+  if (list) list.push(m);
+  else byDay.set(m.day, [m]);
+}
+---
+
+<Base>
+  <h1 class="sr-only">Games this week</h1>
+  <DateStrip days={counts} today={today} />
+  {
+    counts.map(({ day }) => (
+      <section
+        class:list={['day', { 'is-active': day === today }]}
+        id={`day-${day}`}
+        aria-labelledby={`h-${day}`}
+      >
+        <h2 id={`h-${day}`}>
+          {day === today ? (
+            <>
+              Today <span class="muted">· {longDayLabel(day)}</span>
+            </>
+          ) : (
+            longDayLabel(day)
+          )}
+        </h2>
+        <MatchList matches={byDay.get(day) ?? []} />
+      </section>
+    ))
+  }
+  <AdSlot id="day-1" />
+
+  <script is:inline>
+    // Show one day at a time. The day is kept in the URL hash (/#day-2026-11-04),
+    // so links can be shared and Back returns to the previous day.
+    (() => {
+      const sections = [...document.querySelectorAll('section.day')];
+      if (sections.length === 0) return;
+      const buttons = [...document.querySelectorAll('.date-strip a[data-day]')];
+      const poolLinks = [...document.querySelectorAll('.pool-toggle a')];
+
+      function show(hash) {
+        const target = sections.find((s) => '#' + s.id === hash) ?? sections[0];
+        for (const s of sections) s.classList.toggle('is-active', s === target);
+        // Switching Men/Women keeps the selected day.
+        for (const a of poolLinks) a.hash = target === sections[0] ? '' : target.id;
+        for (const button of buttons) {
+          const on = 'day-' + button.dataset.day === target.id;
+          button.classList.toggle('is-selected', on);
+          if (on) button.setAttribute('aria-current', 'page');
+          else button.removeAttribute('aria-current');
+        }
+      }
+
+      document.querySelector('.date-strip').addEventListener('click', (e) => {
+        const link = e.target.closest('a[href^="#day-"]');
+        if (!link || e.metaKey || e.ctrlKey || e.shiftKey) return;
+        e.preventDefault(); // no jump down the page
+        if (location.hash !== link.hash) history.pushState(null, '', link.hash);
+        show(link.hash);
+      });
+      addEventListener('popstate', () => show(location.hash));
+      show(location.hash);
+      // Opening /#day-... would otherwise scroll past the date strip.
+      if (location.hash) requestAnimationFrame(() => scrollTo(0, 0));
+    })();
+  </script>
+</Base>

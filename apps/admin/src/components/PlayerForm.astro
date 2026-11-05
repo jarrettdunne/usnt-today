@@ -1,0 +1,91 @@
+---
+import type { Option, PlayerInput } from '@usnt/db';
+
+interface Props {
+  teams: Option[];
+  values?: Partial<PlayerInput>;
+  submitLabel: string;
+  error?: string;
+}
+
+const { teams, values = {}, submitLabel, error } = Astro.props;
+---
+
+<form method="post">
+  {
+    error && (
+      <p role="alert">
+        <strong>{error}</strong>
+      </p>
+    )
+  }
+  <p>
+    <label>Name<br /><input name="name" required value={values.name ?? ''} /></label>
+  </p>
+  <p>
+    <label>
+      URL slug (leave blank to make one from the name)<br />
+      <input name="slug" pattern="[a-z0-9]+(-[a-z0-9]+)*" value={values.slug ?? ''} />
+    </label>
+  </p>
+  <p>
+    <label>
+      Pool<br />
+      <select name="pool">
+        <option value="men" selected={values.pool !== 'women'}>Men</option>
+        <option value="women" selected={values.pool === 'women'}>Women</option>
+      </select>
+    </label>
+  </p>
+  <p>
+    <label>
+      Group<br />
+      <select name="player_group">
+        <option value="active" selected={values.player_group !== 'eligible'}>Active (committed to the U.S.)</option>
+        <option value="eligible" selected={values.player_group === 'eligible'}>Eligible (not confirmed as committed)</option>
+      </select>
+    </label>
+  </p>
+  <p>
+    <label>Position<br /><input name="position" placeholder="GK, DF, MF or FW" value={values.position ?? ''} /></label>
+  </p>
+  <p>
+    <label>Birth date<br /><input type="date" name="birth_date" value={values.birth_date ?? ''} /></label>
+  </p>
+  <p>
+    <label>
+      Current club<br />
+      <select name="current_team_id">
+        <option value="">None</option>
+        {
+          teams.map((t) => (
+            <option value={t.id} selected={t.id === values.current_team_id}>
+              {t.name}
+            </option>
+          ))
+        }
+      </select>
+    </label>
+    {
+      teams.length === 0 && (
+        <>
+          <br />
+          <small>Clubs appear here after the jobs Worker's first sync.</small>
+        </>
+      )
+    }
+  </p>
+  <p>
+    <label>
+      Eligibility source<br />
+      <input name="eligibility_source" placeholder="Where the nationality information comes from" value={values.eligibility_source ?? ''} />
+    </label>
+  </p>
+  <p>
+    <label>Eligibility source link<br /><input type="url" name="eligibility_url" value={values.eligibility_url ?? ''} /></label>
+  </p>
+  <p>
+    <label>Short bio (optional)<br /><textarea name="bio" rows="3" cols="60">{values.bio ?? ''}</textarea></label>
+  </p>
+  <p><button type="submit">{submitLabel}</button></p>
+</form>

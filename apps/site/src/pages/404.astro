@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+
+// Astro.rewrite('/404') resets the status to 200, so set it here. Without this,
+// missing players and bad dates would be served (and edge-cached) as 200s.
+Astro.response.status = 404;
+---
+
+<Base title="Page not found">
+  <h1>Page not found</h1>
+  <p>That page doesn't exist. <a href="/">See today's games</a>.</p>
+</Base>

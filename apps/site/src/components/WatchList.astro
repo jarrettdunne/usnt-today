@@ -1,0 +1,31 @@
+---
+import { safeHref, type WatchOption } from '@usnt/db';
+
+interface Props {
+  watch: WatchOption[];
+}
+
+const { watch } = Astro.props;
+---
+
+{
+  watch.length === 0 ? (
+    <span>Not listed</span>
+  ) : (
+    watch.map((w, i) => {
+      const href = safeHref(w.url);
+      return (
+        <>
+          {i > 0 && ', '}
+          {href ? (
+            <a href={href} rel="nofollow noopener">
+              {w.network}
+            </a>
+          ) : (
+            w.network
+          )}
+        </>
+      );
+    })
+  )
+}

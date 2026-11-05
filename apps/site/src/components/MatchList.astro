@@ -1,0 +1,102 @@
+---
+// One day's matches, grouped by competition (headings are h3, under the day's h2).
+import type { DayMatch } from '@usnt/db';
+import Crest from './Crest.astro';
+import LocalTime from './LocalTime.astro';
+import WatchList from './WatchList.astro';
+import { groupByCompetition } from '../lib/group-matches';
+import { ROLE_LABELS, playersByTeam } from '../lib/match-players';
+
+interface Props {
+  matches: DayMatch[];
+}
+
+const { matches } = Astro.props;
+const groups = groupByCompetition(matches);
+
+const hasScore = (m: DayMatch) => m.status === 'finished' && m.home_score !== null && m.away_score !== null;
+
+const STATUS_LABELS: Partial<Record<DayMatch['status'], string>> = {
+  finished: 'Final',
+  live: 'Live',
+  postponed: 'Postponed',
+  cancelled: 'Cancelled',
+};
+
+/**
+ * Each competition keeps the same accent color from day to day: its display order
+ * picks a color from the 10-color palette, or a hash of its name if it has none.
+ */
+function seriesClass(competition: string, order: number | null): string {
+  let n = order;
+  if (n === null) {
+    n = 0;
+    for (const ch of competition) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
+  }
+  return `series-${Math.abs(n) % 10}`;
+}
+---
+
+{groups.length === 0 && <p class="no-games">No tracked players have games on this day.</p>}
+{
+  groups.map((group) => (
+    <>
+      <section class:list={['competition', seriesClass(group.competition, group.order)]}>
+        <h3>{group.competition}</h3>
+        <ul class="matches">
+          {group.matches.map((m) => (
+            <li class="match">
+              <div class="match-time">
+                <LocalTime iso={m.kickoff_utc} mode="time" confirmed={m.kickoff_confirmed} />
+              </div>
+              <div>
+                <p class="match-teams">
+                  <Crest url={m.home_crest} />
+                  {m.home}{' '}
+                  {hasScore(m) ? (
+                    <span class="score">
+                      {m.home_score}-{m.away_score}
+                    </span>
+                  ) : (
+                    <span class="vs">vs</span>
+                  )}{' '}
+                  <Crest url={m.away_crest} />
+                  {m.away}{' '}
+                  {STATUS_LABELS[m.status] && (
+                    <span class={`status status-${m.status}`}>{STATUS_LABELS[m.status]}</span>
+                  )}
+                </p>
+                <ul class="match-players">
+                  {playersByTeam(m).map((row) => (
+                    <li>
+                      <span class="team">{row.team}:</span>{' '}
+                      {row.roles.map((r, ri) => (
+                        <>
+                          {ri > 0 && '; '}
+                          <span class="role">
+                            <span class={`swatch swatch-${r.role}`} />
+                            {ROLE_LABELS[r.role]}:
+                          </span>{' '}
+                          {r.players.map((p, i) => (
+                            <>
+                              {i > 0 && ', '}
+                              <a href={`/player/${p.slug}`}>{p.name}</a>
+                              {p.position && <span class="muted"> ({p.position})</span>}
+                            </>
+                          ))}
+                        </>
+                      ))}
+                    </li>
+                  ))}
+                </ul>
+                <p class="match-watch">
+                  Watch: <WatchList watch={m.watch} />
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  ))
+}
